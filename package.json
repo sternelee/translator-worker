@@ -1,5 +1,5 @@
 {
-  "name": "@sternelee/translate-worker",
+  "name": "@sternelee/translator-worker",
   "version": "1.0.0",
   "author": "sternelee",
   "main": "dist/lib/index.umd.js",

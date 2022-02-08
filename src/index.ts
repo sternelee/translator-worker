@@ -656,7 +656,7 @@ pageTranslator.onPageLanguageStateChange = function (callback) {
   pageLanguageStateObservers.push(callback);
 };
 
-pageTranslator.translatePage = function (targetLanguage) {
+pageTranslator.translatePage = function (targetLanguage = "zh") {
   fooCount++;
   pageTranslator.restorePage();
   // showOriginal.enable();
