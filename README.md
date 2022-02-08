@@ -1,4 +1,4 @@
-## vite-translation-worker
+## translator-worker
 
 前端实现页面翻译,从 [Traduzir-paginas-web 插件](https://gitee.com/sternelee/Traduzir-paginas-web) 提取而来
 
