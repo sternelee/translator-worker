@@ -1,82 +1,64 @@
 // import WebWorker from "./worker.ts?worker&inline";
 import TranslationService from "./translationService";
+import {
+  ServiceName,
+  ISources,
+  ISources3d,
+  IPiecesToTranslate,
+  IAttribeToTranslate,
+} from "./interface";
+import global from "./global";
 
 function backgroundTranslateHTML(
-  translationService,
-  targetLanguage,
-  sourceArray3d,
-  dontSortResults
+  translationService: ServiceName,
+  targetLanguage: string,
+  sourceArray3d: ISources3d,
+  dontSortResults: boolean
 ) {
-  /* console.log(
+  console.log(
     translationService,
     targetLanguage,
     sourceArray3d,
     dontSortResults
-  ); */
-  return new Promise((resolve, reject) => {
-    /* sendMessage({
-            action: "translateHTML",
-            translationService,
-            targetLanguage,
-            sourceArray3d,
-            dontSortResults
-        }, response => {
-            resolve(response)
-        }) */
-    TranslationService.translateHTML(
-      {
-        action: "translateHTML",
-        translationService,
-        targetLanguage,
-        sourceArray3d,
-        dontSortResults,
-      },
-      false,
-      (res) => resolve(res)
+  );
+  return new Promise(async (resolve, reject) => {
+    const translator = TranslationService[translationService];
+    const res = await translator["translateHTML"](
+      sourceArray3d,
+      targetLanguage,
+      dontSortResults
     );
+    console.log(res);
+    resolve(res);
   });
 }
 
 function backgroundTranslateText(
-  translationService,
-  targetLanguage,
-  sourceArray
+  translationService: ServiceName,
+  targetLanguage: string,
+  sourceArray: ISources
 ) {
   // console.log(translationService, targetLanguage, sourceArray);
-  return new Promise((resolve, reject) => {
-    /* sendMessage({
-            action: "translateText",
-            translationService,
-            targetLanguage,
-            sourceArray
-        }, response => {
-            resolve(response)
-        }) */
+  return new Promise(async (resolve, reject) => {
+    const translator = TranslationService[translationService];
+    const res = await translator["translateText"](sourceArray, targetLanguage);
+    resolve(res);
   });
 }
 
 function backgroundTranslateSingleText(
-  translationService,
-  targetLanguage,
-  source
+  translationService: ServiceName,
+  targetLanguage: string,
+  source: string
 ) {
-  // console.log(translationService, targetLanguage, source);
-  return new Promise((resolve, reject) => {
-    /* sendMessage({
-            action: "translateSingleText",
-            translationService,
-            targetLanguage,
-            source
-        }, response => {
-            resolve(response)
-        }) */
+  console.log('backgroundTranslateSingleText', translationService, targetLanguage, source);
+  return new Promise(async (resolve, reject) => {
+    const translator = TranslationService[translationService];
+    const res = await translator["translateSingleText"](source, targetLanguage);
+    console.log('backgroundTranslateSingleText', res)
+    resolve(res);
   });
 }
-
-let pageTranslator = {
-  translatePage: function (targetLanguage: string) {},
-  restorePage: function () {},
-};
 
 const htmlTagsInlineText = [
   "#text",
@@ -105,30 +87,30 @@ const htmlTagsInlineText = [
 const htmlTagsInlineIgnore = ["BR", "CODE", "KBD", "WBR"]; // and input if type is submit or button, and pre depending on settings
 const htmlTagsNoTranslate = ["TITLE", "SCRIPT", "STYLE", "TEXTAREA", "svg"]; //TODO verificar porque 'svg' é com letras minúsculas
 
-/* if (twpConfig.get('translateTag_pre') !== 'yes') {
-        htmlTagsInlineIgnore.push('PRE')
-    } */
+if (global.translateTag_pre !== "yes") {
+  htmlTagsInlineIgnore.push("PRE");
+}
 
 //TODO FOO
 // Pieces are a set of nodes separated by inline tags that form a sentence or paragraph.
-let piecesToTranslate = [];
+let piecesToTranslate: IPiecesToTranslate[] = [];
 let originalTabLanguage = "und";
 let currentPageLanguage = "und";
 let pageLanguageState = "original";
 let currentTargetLanguage = "zh-cn";
-let currentPageTranslatorService = "google";
+let currentPageTranslatorService: ServiceName = "google";
 let dontSortResults = true;
 let fooCount = 0;
 
 let originalPageTitle;
 
-let attributesToTranslate = [];
+let attributesToTranslate: any[] = [];
 
 let translateNewNodesTimerHandler;
-let newNodes = [];
-let removedNodes = [];
+let newNodes: any[] = [];
+let removedNodes: any[] = [];
 
-let nodesToRestore = [];
+let nodesToRestore: any[] = [];
 
 function translateNewNodes() {
   try {
@@ -136,6 +118,7 @@ function translateNewNodes() {
       if (removedNodes.indexOf(nn) != -1) return;
 
       let newPiecesToTranslate = getPiecesToTranslate(nn);
+      console.log("newPiecesToTranslate", newPiecesToTranslate);
 
       for (const i in newPiecesToTranslate) {
         const newNodes = newPiecesToTranslate[i].nodes;
@@ -161,7 +144,7 @@ function translateNewNodes() {
 }
 
 const mutationObserver = new MutationObserver(function (mutations) {
-  const piecesToTranslate = [];
+  const piecesToTranslate: any[] = [];
 
   mutations.forEach((mutation) => {
     mutation.addedNodes.forEach((addedNode) => {
@@ -221,8 +204,8 @@ const handleVisibilityChange = function () {
 };
 document.addEventListener("visibilitychange", handleVisibilityChange, false);
 
-function getPiecesToTranslate(root = document.body) {
-  const piecesToTranslate = [
+function getPiecesToTranslate(root = document.body): IPiecesToTranslate[] {
+  const piecesToTranslate: IPiecesToTranslate[] = [
     {
       isTranslated: false,
       parentElement: null,
@@ -234,7 +217,7 @@ function getPiecesToTranslate(root = document.body) {
   let index = 0;
   let currentParagraphSize = 0;
 
-  const getAllNodes = function (node, lastHTMLElement = null) {
+  const getAllNodes = function (node: any, lastHTMLElement = null) {
     if (node.nodeType == 1 || node.nodeType == 11) {
       if (node.nodeType == 11) {
         lastHTMLElement = node.host;
@@ -264,7 +247,7 @@ function getPiecesToTranslate(root = document.body) {
         }
       }
 
-      function getAllChilds(childNodes) {
+      function getAllChilds(childNodes: any[]) {
         Array.from(childNodes).forEach((_node) => {
           if (_node.nodeType == 1) {
             lastHTMLElement = _node;
@@ -337,7 +320,7 @@ function getPiecesToTranslate(root = document.body) {
         if (currentParagraphSize > 1000) {
           currentParagraphSize = 0;
           piecesToTranslate[index].bottomElement = lastHTMLElement;
-          const pieceInfo = {
+          const pieceInfo: IPiecesToTranslate = {
             isTranslated: false,
             parentElement: null,
             topElement: lastHTMLElement,
@@ -363,11 +346,12 @@ function getPiecesToTranslate(root = document.body) {
     piecesToTranslate.pop();
   }
 
+  console.log("piecesToTranslate", piecesToTranslate);
   return piecesToTranslate;
 }
 
 function getAttributesToTranslate(root = document.body) {
-  const attributesToTranslate = [];
+  const attributesToTranslate: IAttribeToTranslate[] = [];
 
   const placeholdersElements = root.querySelectorAll(
     "input[placeholder], textarea[placeholder]"
@@ -377,10 +361,10 @@ function getAttributesToTranslate(root = document.body) {
   );
   const valueElements = root.querySelectorAll(
     'input[type="button"], input[type="submit"]'
-  );
+  ) as any;
   const titleElements = root.querySelectorAll("body [title]");
 
-  function hasNoTranslate(elem) {
+  function hasNoTranslate(elem: Element) {
     if (
       elem &&
       (elem.classList.contains("notranslate") ||
@@ -451,7 +435,7 @@ function getAttributesToTranslate(root = document.body) {
   return attributesToTranslate;
 }
 
-function encapsulateTextNode(node) {
+function encapsulateTextNode(node: Element) {
   const fontNode = document.createElement("font");
   fontNode.setAttribute("style", "vertical-align: inherit;");
   fontNode.textContent = node.textContent;
@@ -461,7 +445,10 @@ function encapsulateTextNode(node) {
   return fontNode;
 }
 
-function translateResults(piecesToTranslateNow, results) {
+function translateResults(
+  piecesToTranslateNow: IPiecesToTranslate[],
+  results: any[]
+) {
   if (dontSortResults) {
     for (let i = 0; i < results.length; i++) {
       for (let j = 0; j < results[i].length; j++) {
@@ -561,7 +548,7 @@ function translateDynamically() {
 
         const currentFooCount = fooCount;
 
-        const piecesToTranslateNow = [];
+        const piecesToTranslateNow: any[] = [];
         piecesToTranslate.forEach((ptt) => {
           if (!ptt.isTranslated) {
             if (
@@ -574,7 +561,7 @@ function translateDynamically() {
           }
         });
 
-        const attributesToTranslateNow = [];
+        const attributesToTranslateNow: any[] = [];
         attributesToTranslate.forEach((ati) => {
           if (!ati.isTranslated) {
             if (isInScreen(ati.node)) {
@@ -592,7 +579,7 @@ function translateDynamically() {
               ptt.nodes.map((node) => node.textContent)
             ),
             dontSortResults
-          ).then((results) => {
+          ).then((results: any) => {
             // console.log("results", results);
             if (
               pageLanguageState === "translated" &&
@@ -643,207 +630,20 @@ function translatePageTitle() {
     currentPageTranslatorService,
     currentTargetLanguage,
     originalPageTitle
-  ).then((result) => {
+  ).then((result: any) => {
     if (result) {
       document.title = result;
     }
   });
 }
 
-const pageLanguageStateObservers = [];
-
-pageTranslator.onPageLanguageStateChange = function (callback) {
-  pageLanguageStateObservers.push(callback);
-};
-
-pageTranslator.translatePage = function (targetLanguage = "zh") {
-  fooCount++;
-  pageTranslator.restorePage();
-  // showOriginal.enable();
-
-  // dontSortResults = twpConfig.get("dontSortResults") == "yes" ? true : false;
-
-  if (targetLanguage) {
-    currentTargetLanguage = targetLanguage;
-  }
-
-  piecesToTranslate = getPiecesToTranslate();
-  attributesToTranslate = getAttributesToTranslate();
-
-  pageLanguageState = "translated";
-  /* chrome.runtime.sendMessage({
-      action: "setPageLanguageState",
-      pageLanguageState,
-    }); */
-  pageLanguageStateObservers.forEach((callback) => callback(pageLanguageState));
-  currentPageLanguage = currentTargetLanguage;
-
-  translatePageTitle();
-
-  enableMutatinObserver();
-
-  translateDynamically();
-};
-
-pageTranslator.restorePage = function () {
-  fooCount++;
-  piecesToTranslate = [];
-
-  // showOriginal.disable();
-  disableMutatinObserver();
-
-  pageLanguageState = "original";
-  /* chrome.runtime.sendMessage({
-      action: "setPageLanguageState",
-      pageLanguageState,
-    }); */
-  pageLanguageStateObservers.forEach((callback) => callback(pageLanguageState));
-  currentPageLanguage = originalTabLanguage;
-
-  if (originalPageTitle) {
-    document.title = originalPageTitle;
-  }
-  originalPageTitle = null;
-
-  for (const ntr of nodesToRestore) {
-    ntr.node.replaceWith(ntr.original);
-  }
-  nodesToRestore = [];
-
-  //TODO não restaurar atributos que foram modificados
-  for (const ati of attributesToTranslate) {
-    if (ati.isTranslated) {
-      ati.node.setAttribute(ati.attrName, ati.original);
-    }
-  }
-  attributesToTranslate = [];
-};
-
-pageTranslator.swapTranslationService = function () {
-  if (currentPageTranslatorService === "google") {
-    currentPageTranslatorService = "yandex";
-  } else {
-    currentPageTranslatorService = "google";
-  }
-  if (pageLanguageState === "translated") {
-    pageTranslator.translatePage();
-  }
-};
+const pageLanguageStateObservers: Function[] = [];
 
 let alreadyGotTheLanguage = false;
-const observers = [];
-
-pageTranslator.onGetOriginalTabLanguage = function (callback) {
-  if (alreadyGotTheLanguage) {
-    callback(originalTabLanguage);
-  } else {
-    observers.push(callback);
-  }
-};
-
-/* chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        if (request.action === "translatePage") {
-            if (request.targetLanguage === "original") {
-                pageTranslator.restorePage()
-            } else {
-                pageTranslator.translatePage(request.targetLanguage)
-            }
-        } else if (request.action === "restorePage") {
-            pageTranslator.restorePage()
-        } else if (request.action === "getOriginalTabLanguage") {
-            pageTranslator.onGetOriginalTabLanguage(function () {
-                sendResponse(originalTabLanguage)
-            })
-            return true
-        } else if (request.action === "getCurrentPageLanguage") {
-            sendResponse(currentPageLanguage)
-        } else if (request.action === "getCurrentPageLanguageState") {
-            sendResponse(pageLanguageState)
-        } else if (request.action === "getCurrentPageTranslatorService") {
-            sendResponse(currentPageTranslatorService)
-        } else if (request.action === "swapTranslationService") {
-            pageTranslator.swapTranslationService()
-        } else if (request.action === "toggle-translation") {
-            if (pageLanguageState === "translated") {
-                pageTranslator.restorePage()
-            } else {
-                pageTranslator.translatePage()
-            }
-        } else if (request.action === "autoTranslateBecauseClickedALink") {
-            if (twpConfig.get("autoTranslateWhenClickingALink") === "yes") {
-                pageTranslator.onGetOriginalTabLanguage(function () {
-                    if (pageLanguageState === "original" && originalTabLanguage !== currentTargetLanguage && twpConfig.get("neverTranslateLangs").indexOf(originalTabLanguage) === -1) {
-                        pageTranslator.translatePage()
-                    }
-                })
-            }
-        }
-    }) */
+const observers: Function[] = [];
 
 // Requests the detection of the tab language in the background
 if (window.self === window.top) {
-  // is main frame
-  const onTabVisible = function () {
-    chrome.runtime.sendMessage(
-      {
-        action: "detectTabLanguage",
-      },
-      (result) => {
-        result = result || "und";
-        if (result === "und") {
-          originalTabLanguage = result;
-        } else {
-          const langCode = twpLang.checkLanguageCode(result);
-          if (langCode) {
-            originalTabLanguage = langCode;
-          }
-          if (
-            location.hostname === "translatewebpages.org" &&
-            location.href.indexOf("?autotranslate") !== -1
-          ) {
-            pageTranslator.translatePage();
-          } else {
-            if (
-              location.hostname !== "translate.googleusercontent.com" &&
-              location.hostname !== "translate.google.com" &&
-              location.hostname !== "translate.yandex.com"
-            ) {
-              if (
-                pageLanguageState === "original" &&
-                !platformInfo.isMobile.any &&
-                !chrome.extension.inIncognitoContext
-              ) {
-                /* if (
-                    twpConfig
-                      .get("neverTranslateSites")
-                      .indexOf(tabHostName) === -1
-                  ) {
-                    if (
-                      langCode &&
-                      langCode !== currentTargetLanguage &&
-                      twpConfig
-                        .get("alwaysTranslateLangs")
-                        .indexOf(langCode) !== -1
-                    ) {
-                      pageTranslator.translatePage();
-                    } else if (
-                      twpConfig
-                        .get("alwaysTranslateSites")
-                        .indexOf(tabHostName) !== -1
-                    ) {
-                      pageTranslator.translatePage();
-                    }
-                  } */
-              }
-            }
-          }
-        }
-
-        observers.forEach((callback) => callback(originalTabLanguage));
-        alreadyGotTheLanguage = true;
-      }
-    );
-  };
   setTimeout(function () {
     if (document.visibilityState == "visible") {
       // onTabVisible();
@@ -864,22 +664,94 @@ if (window.self === window.top) {
       );
     }
   }, 120);
-} else {
-  // is subframe (iframe)
-  /* chrome.runtime.sendMessage({
-            action: "getMainFrameTabLanguage"
-        }, result => {
-            originalTabLanguage = result || "und"
-            observers.forEach(callback => callback(originalTabLanguage))
-            alreadyGotTheLanguage = true
-        }) */
-  /* chrome.runtime.sendMessage({
-            action: "getMainFramePageLanguageState"
-        }, result => {
-            if (result === "translated" && pageLanguageState === "original") {
-                pageTranslator.translatePage()
-            }
-        }) */
 }
+
+let pageTranslator = {
+  translatePage: function (targetLanguage?: string) {
+    fooCount++;
+    pageTranslator.restorePage();
+    // showOriginal.enable();
+
+    // dontSortResults = twpConfig.get("dontSortResults") == "yes" ? true : false;
+
+    if (targetLanguage) {
+      currentTargetLanguage = targetLanguage;
+    }
+
+    piecesToTranslate = getPiecesToTranslate();
+    attributesToTranslate = getAttributesToTranslate();
+
+    pageLanguageState = "translated";
+    /* chrome.runtime.sendMessage({
+      action: "setPageLanguageState",
+      pageLanguageState,
+    }); */
+    pageLanguageStateObservers.forEach((callback) =>
+      callback(pageLanguageState)
+    );
+    currentPageLanguage = currentTargetLanguage;
+
+    translatePageTitle();
+
+    enableMutatinObserver();
+
+    translateDynamically();
+  },
+  restorePage: function () {
+    fooCount++;
+    piecesToTranslate = [];
+
+    // showOriginal.disable();
+    disableMutatinObserver();
+
+    pageLanguageState = "original";
+    /* chrome.runtime.sendMessage({
+      action: "setPageLanguageState",
+      pageLanguageState,
+    }); */
+    pageLanguageStateObservers.forEach((callback) =>
+      callback(pageLanguageState)
+    );
+    currentPageLanguage = originalTabLanguage;
+
+    if (originalPageTitle) {
+      document.title = originalPageTitle;
+    }
+    originalPageTitle = null;
+
+    for (const ntr of nodesToRestore) {
+      ntr.node.replaceWith(ntr.original);
+    }
+    nodesToRestore = [];
+
+    //TODO não restaurar atributos que foram modificados
+    for (const ati of attributesToTranslate) {
+      if (ati.isTranslated) {
+        ati.node.setAttribute(ati.attrName, ati.original);
+      }
+    }
+    attributesToTranslate = [];
+  },
+  onPageLanguageStateChange: function (callback: Function) {
+    pageLanguageStateObservers.push(callback);
+  },
+  swapTranslationService: function () {
+    if (currentPageTranslatorService === "google") {
+      currentPageTranslatorService = "yandex";
+    } else {
+      currentPageTranslatorService = "google";
+    }
+    if (pageLanguageState === "translated") {
+      pageTranslator.translatePage();
+    }
+  },
+  onGetOriginalTabLanguage: function (callback: Function) {
+    if (alreadyGotTheLanguage) {
+      callback(originalTabLanguage);
+    } else {
+      observers.push(callback);
+    }
+  },
+};
 
 export default pageTranslator;

@@ -13,7 +13,7 @@ window.addEventListener("load", async () => {
   console.log(document.getElementById("app"));
   console.log(translator);
   translator.translatePage("zh");
-  setTimeout(() => {
-    translator.restorePage()
-  }, 5000)
+  // setTimeout(() => {
+  //   translator.restorePage()
+  // }, 5000)
 });

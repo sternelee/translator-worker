@@ -1,10 +1,11 @@
 //TODO dividir em varios requests
 //TODO Especificar o source lang com page no idioma do paragrafo (dividindo as requests)
 import translationCache from "./translationCache";
-
-const translationService: any = {};
-
-const googleTranslateTKK = "448487.932609646";
+import { ServiceName, ITransInfo, ISources3d } from "./interface";
+import { googleTranslateTKK } from "./constant";
+import { getYandexSID } from "./yandexSID";
+import { getBingSID } from "./bingSID";
+import global from "./global";
 
 function escapeHTML(unsafe: string) {
   return unsafe
@@ -104,168 +105,12 @@ function calcHash(query: string, windowTkk: string) {
   return normalizedResult.toString() + "." + (normalizedResult ^ tkkIndex);
 }
 
-let lastYandexRequestSIDTime: number | null = null;
-let yandexTranslateSID: string | null = null;
-let yandexSIDNotFound = false;
-let yandexGetSidPromise: Promise<void> | null = null;
-async function getYandexSID() {
-  if (yandexGetSidPromise) {
-    return yandexGetSidPromise;
-  }
-
-  yandexGetSidPromise = new Promise((resolve) => {
-    let updateYandexSid = false;
-    if (lastYandexRequestSIDTime) {
-      const date = new Date();
-      if (yandexTranslateSID) {
-        date.setHours(date.getHours() - 12);
-      } else if (yandexSIDNotFound) {
-        date.setMinutes(date.getMinutes() - 30);
-      } else {
-        date.setMinutes(date.getMinutes() - 2);
-      }
-      if (date.getTime() > lastYandexRequestSIDTime) {
-        updateYandexSid = true;
-      }
-    } else {
-      updateYandexSid = true;
-    }
-
-    if (updateYandexSid) {
-      lastYandexRequestSIDTime = Date.now();
-
-      const http = new XMLHttpRequest();
-      http.open(
-        "GET",
-        "https://translate.yandex.net/website-widget/v1/widget.js?widgetId=ytWidget&pageLang=es&widgetTheme=light&autoMode=false"
-      );
-      http.send();
-      http.onload = () => {
-        const result = http.responseText.match(/sid\:\s\'[0-9a-f\.]+/);
-        if (result && result[0] && result[0].length > 7) {
-          yandexTranslateSID = result[0].substring(6);
-          yandexSIDNotFound = false;
-        } else {
-          yandexSIDNotFound = true;
-        }
-        resolve();
-      };
-      http.onerror = (e) => {
-        console.error(e);
-        resolve();
-      };
-    } else {
-      resolve();
-    }
-  });
-
-  yandexGetSidPromise.finally(() => {
-    yandexGetSidPromise = null;
-  });
-
-  return await yandexGetSidPromise;
-}
-
-let lastBingRequestSIDTime: number | null = null;
-let bingTranslateSID: string | null = null;
-let bingTranslate_IID_IG: string | null = null;
-let bingSIDNotFound = false;
-let bingGetSidPromise: Promise<void> | null = null;
-async function getBingSID() {
-  if (bingGetSidPromise) {
-    return bingGetSidPromise;
-  }
-
-  bingGetSidPromise = new Promise((resolve) => {
-    let updateBingSid = false;
-    if (lastBingRequestSIDTime) {
-      const date = new Date();
-      if (bingTranslateSID) {
-        date.setHours(date.getHours() - 12);
-      } else if (bingSIDNotFound) {
-        date.setMinutes(date.getMinutes() - 30);
-      } else {
-        date.setMinutes(date.getMinutes() - 2);
-      }
-      if (date.getTime() > lastBingRequestSIDTime) {
-        updateBingSid = true;
-      }
-    } else {
-      updateBingSid = true;
-    }
-
-    if (updateBingSid) {
-      lastBingRequestSIDTime = Date.now();
-
-      const http = new XMLHttpRequest();
-      http.open("GET", "https://www.bing.com/translator");
-      http.send();
-      http.onload = () => {
-        const result = http.responseText.match(
-          /params_RichTranslateHelper\s=\s\[[^\]]+/
-        );
-        const data_iid_r = http.responseText.match(
-          /data-iid\=\"[a-zA-Z0-9\.]+/
-        );
-        const IG_r = http.responseText.match(/IG\:\"[a-zA-Z0-9\.]+/);
-        if (
-          result &&
-          result[0] &&
-          result[0].length > 50 &&
-          data_iid_r &&
-          data_iid_r[0] &&
-          IG_r &&
-          IG_r[0]
-        ) {
-          const params_RichTranslateHelper = result[0]
-            .substring("params_RichTranslateHelper = [".length)
-            .split(",");
-          const data_iid = data_iid_r[0].substring('data-iid="'.length);
-          const IG = IG_r[0].substring('IG:"'.length);
-          if (
-            params_RichTranslateHelper &&
-            params_RichTranslateHelper[0] &&
-            params_RichTranslateHelper[1] &&
-            parseInt(params_RichTranslateHelper[0]) &&
-            data_iid &&
-            IG
-          ) {
-            bingTranslateSID = `&token=${params_RichTranslateHelper[1].substring(
-              1,
-              params_RichTranslateHelper[1].length - 1
-            )}&key=${parseInt(params_RichTranslateHelper[0])}`;
-            bingTranslate_IID_IG = `IG=${IG}&IID=${data_iid}`;
-            bingSIDNotFound = false;
-          } else {
-            bingSIDNotFound = true;
-          }
-        } else {
-          bingSIDNotFound = true;
-        }
-        resolve();
-      };
-      http.onerror = (e) => {
-        console.error(e);
-        resolve();
-      };
-    } else {
-      resolve();
-    }
-  });
-
-  bingGetSidPromise.finally(() => {
-    bingGetSidPromise = null;
-  });
-
-  return await bingGetSidPromise;
-}
-
 const googleTranslationInProgress = {};
 const yandexTranslationInProgress = {};
 const bingTranslationInProgress = {};
 
 function getTranslationInProgress(
-  translationService: string,
+  translationService: ServiceName,
   targetLanguage: string
 ) {
   let translationInProgress: any;
@@ -284,23 +129,18 @@ function getTranslationInProgress(
   return translationInProgress[targetLanguage];
 }
 
-translationService.google = {};
-translationService.yandex = {};
-translationService.bing = {};
-translationService.deepl = {};
-
 async function translateHTML(
-  translationService: string,
+  translationService: ServiceName,
   targetLanguage: string,
   translationServiceURL: string,
   sourceArray: string[],
   requestBody: string,
-  textParamName,
-  translationProgress,
+  textParamName: string,
+  translationProgress: ITransInfo[],
   dontSaveInCache = false
-) {
-  const thisTranslationProgress = [];
-  const requests = [];
+): Promise<any> {
+  const thisTranslationProgress: ITransInfo[] = [];
+  const requests: any[] = [];
   /* console.log(
     "translateHTML",
     targetLanguage,
@@ -316,18 +156,18 @@ async function translateHTML(
     if (transInfo) {
       thisTranslationProgress.push(transInfo);
     } else {
-      let translated;
+      let translated: boolean = false;
       try {
         translated = await translationCache.get(
           translationService,
           str,
           targetLanguage
         );
-        // console.log("translated", translated);
+        console.log("translated", translated);
       } catch (e) {
         console.error(e);
       }
-      let newTransInfo;
+      let newTransInfo: ITransInfo;
       if (translated) {
         newTransInfo = {
           source: str,
@@ -391,7 +231,7 @@ async function translateHTML(
         http.open(
           "POST",
           "https://www.bing.com/ttranslatev3?isVertical=1&" +
-            bingTranslate_IID_IG
+            global.bingTranslate_IID_IG
         );
         http.setRequestHeader(
           "Content-Type",
@@ -399,14 +239,14 @@ async function translateHTML(
         );
         http.responseType = "json";
         http.send(
-          `&fromLang=auto-detect${request.requestBody}&to=${targetLanguage}${bingTranslateSID}`
+          `&fromLang=auto-detect${request.requestBody}&to=${targetLanguage}${global.bingTranslateSID}`
         );
       }
 
-      http.onload = (e) => {
+      http.onload = () => {
         try {
           const response = http.response;
-          let responseJson;
+          let responseJson: any;
           if (translationService === "yandex") {
             responseJson = response.text;
           } else if (translationService === "google") {
@@ -500,8 +340,9 @@ async function translateHTML(
 
 // nao funciona bem por problemas em detectar o idioma do texto
 async function fixSouceArray(sourceArray3d) {
-  const newSourceArray3d = [];
-  const fixIndexesMap = [];
+  console.log("fixSouceArray", sourceArray3d);
+  const newSourceArray3d: ISources3d = [];
+  const fixIndexesMap: number[] = [];
 
   for (const i in sourceArray3d) {
     newSourceArray3d.push([]);
@@ -511,7 +352,18 @@ async function fixSouceArray(sourceArray3d) {
     let prevDetectedLanguage = null;
     for (const j in sourceArray) {
       const text = sourceArray[j];
-      newSourceArray3d[newSourceArray3d.length - 1].push(text);
+      const detectedLanguage = null;
+      if (
+        detectedLanguage &&
+        prevDetectedLanguage &&
+        detectedLanguage !== prevDetectedLanguage &&
+        newSourceArray3d[newSourceArray3d.length - 1].length > 0
+      ) {
+        newSourceArray3d.push([text]);
+        fixIndexesMap.push(parseInt(i));
+      } else {
+        newSourceArray3d[newSourceArray3d.length - 1].push(text);
+      }
       prevDetectedLanguage = detectedLanguage;
     }
   }
@@ -520,7 +372,8 @@ async function fixSouceArray(sourceArray3d) {
 }
 
 function fixResultArray(resultArray3d, fixIndexesMap) {
-  const newResultArray3d = [];
+  console.log("fixResultArray", resultArray3d, fixIndexesMap);
+  const newResultArray3d: ISources3d = [];
 
   let idx = 0;
   for (const index of fixIndexesMap) {
@@ -544,438 +397,270 @@ function fixResultArray(resultArray3d, fixIndexesMap) {
 
   return newResultArray3d;
 }
-
-// async para fix
-translationService.google.translateHTML = (
-  _sourceArray3d,
-  targetLanguage,
-  dontSaveInCache = false,
-  preseveTextFormat = false,
-  dontSortResults = false
-) => {
-  if (targetLanguage == "zh") {
-    targetLanguage = "zh-CN";
-  }
-
-  //const [sourceArray3d, fixIndexesMap] = await fixSouceArray(_sourceArray3d)
-  const sourceArray = _sourceArray3d.map((sourceArray) => {
-    sourceArray = sourceArray.map((value) => escapeHTML(value));
-    if (sourceArray.length > 1) {
-      sourceArray = sourceArray.map(
-        (value, index) => "<a i=" + index + ">" + value + "</a>"
-      );
-    }
-    //if (preseveTextFormat) {
-    return "<pre>" + sourceArray.join("") + "</pre>";
-    //}
-    //return sourceArray.join("")
-  });
-
-  const requestBody = "";
-  return translateHTML(
-    "google",
-    targetLanguage,
-    `https://translate.googleapis.com/translate_a/t?anno=3&client=te&v=1.0&format=html&sl=auto&tl=` +
-      targetLanguage +
-      "&tk=",
-    sourceArray,
-    requestBody,
-    "q",
-    getTranslationInProgress("google", targetLanguage),
-    dontSaveInCache
-  ).then((thisTranslationProgress) => {
-    const results = thisTranslationProgress.map((value) => value.translated);
-    const resultArray3d = [];
-
-    for (const i in results) {
-      let result = results[i];
-      if (result.indexOf("<pre") !== -1) {
-        result = result.replace("</pre>", "");
-        const index = result.indexOf(">");
-        result = result.slice(index + 1);
+const translationService = {
+  google: {
+    translateHTML: async (
+      _sourceArray3d: any,
+      targetLanguage: string,
+      dontSaveInCache = false,
+      dontSortResults = false
+    ) => {
+      console.log("google translateHTML", _sourceArray3d, targetLanguage);
+      if (targetLanguage == "zh") {
+        targetLanguage = "zh-CN";
       }
-      const sentences = [];
 
-      let idx = 0;
-      while (true) {
-        const sentenceStartIndex = result.indexOf("<b>", idx);
-        if (sentenceStartIndex === -1) break;
-
-        const sentenceFinalIndex = result.indexOf("<i>", sentenceStartIndex);
-
-        if (sentenceFinalIndex === -1) {
-          sentences.push(result.slice(sentenceStartIndex + 3));
-          break;
-        } else {
-          sentences.push(
-            result.slice(sentenceStartIndex + 3, sentenceFinalIndex)
+      //const [sourceArray3d, fixIndexesMap] = await fixSouceArray(_sourceArray3d)
+      const sourceArray = _sourceArray3d.map((sourceArray) => {
+        sourceArray = sourceArray.map((value) => escapeHTML(value));
+        if (sourceArray.length > 1) {
+          sourceArray = sourceArray.map(
+            (value, index) => "<a i=" + index + ">" + value + "</a>"
           );
         }
-        idx = sentenceFinalIndex;
-      }
+        return "<pre>" + sourceArray.join("") + "</pre>";
+      });
 
-      result = sentences.length > 0 ? sentences.join(" ") : result;
-      let resultArray = result.match(/\<a\si\=[0-9]+\>[^\<\>]*(?=\<\/a\>)/g);
+      const requestBody = "";
+      return translateHTML(
+        "google",
+        targetLanguage,
+        `https://translate.googleapis.com/translate_a/t?anno=3&client=te&v=1.0&format=html&sl=auto&tl=` +
+          targetLanguage +
+          "&tk=",
+        sourceArray,
+        requestBody,
+        "q",
+        getTranslationInProgress("google", targetLanguage),
+        dontSaveInCache
+      ).then((thisTranslationProgress: any[]) => {
+        console.log("thisTranslationProgress", thisTranslationProgress);
+        const results = thisTranslationProgress.map(
+          (value: any) => value.translated
+        );
+        const resultArray3d: any[] = [];
 
-      if (dontSortResults) {
-        // Should not sort the <a i={number}> of Google Translate result
-        // Instead of it, join the texts without sorting
-        // https://github.com/FilipePS/Traduzir-paginas-web/issues/163
+        for (const i in results) {
+          let result = results[i];
+          if (result.indexOf("<pre") !== -1) {
+            result = result.replace("</pre>", "");
+            const index = result.indexOf(">");
+            result = result.slice(index + 1);
+          }
+          const sentences: any[] = [];
 
-        if (resultArray && resultArray.length > 0) {
-          resultArray = resultArray.map((value) => {
-            const resultStartAtIndex = value.indexOf(">");
-            return value.slice(resultStartAtIndex + 1);
-          });
-        } else {
-          resultArray = [result];
-        }
+          let idx = 0;
+          while (true) {
+            const sentenceStartIndex = result.indexOf("<b>", idx);
+            if (sentenceStartIndex === -1) break;
 
-        resultArray = resultArray.map((value) => value.replace(/\<\/b\>/g, ""));
-        resultArray = resultArray.map((value) => unescapeHTML(value));
+            const sentenceFinalIndex = result.indexOf(
+              "<i>",
+              sentenceStartIndex
+            );
 
-        resultArray3d.push(resultArray);
-      } else {
-        let indexes;
-        if (resultArray && resultArray.length > 0) {
-          indexes = resultArray
-            .map((value) => parseInt(value.match(/[0-9]+(?=\>)/g)))
-            .filter((value) => !isNaN(value));
-          resultArray = resultArray.map((value) => {
-            const resultStartAtIndex = value.indexOf(">");
-            return value.slice(resultStartAtIndex + 1);
-          });
-        } else {
-          resultArray = [result];
-          indexes = [0];
-        }
+            if (sentenceFinalIndex === -1) {
+              sentences.push(result.slice(sentenceStartIndex + 3));
+              break;
+            } else {
+              sentences.push(
+                result.slice(sentenceStartIndex + 3, sentenceFinalIndex)
+              );
+            }
+            idx = sentenceFinalIndex;
+          }
 
-        resultArray = resultArray.map((value) => value.replace(/\<\/b\>/g, ""));
-        resultArray = resultArray.map((value) => unescapeHTML(value));
+          result = sentences.length > 0 ? sentences.join(" ") : result;
+          let resultArray = result.match(
+            /\<a\si\=[0-9]+\>[^\<\>]*(?=\<\/a\>)/g
+          );
 
-        const finalResulArray = [];
-        for (const j in indexes) {
-          if (finalResulArray[indexes[j]]) {
-            finalResulArray[indexes[j]] += " " + resultArray[j];
+          if (dontSortResults) {
+            // Should not sort the <a i={number}> of Google Translate result
+            // Instead of it, join the texts without sorting
+            // https://github.com/FilipePS/Traduzir-paginas-web/issues/163
+
+            if (resultArray && resultArray.length > 0) {
+              resultArray = resultArray.map((value) => {
+                const resultStartAtIndex = value.indexOf(">");
+                return value.slice(resultStartAtIndex + 1);
+              });
+            } else {
+              resultArray = [result];
+            }
+
+            resultArray = resultArray.map((value) =>
+              value.replace(/\<\/b\>/g, "")
+            );
+            resultArray = resultArray.map((value) => unescapeHTML(value));
+
+            resultArray3d.push(resultArray);
           } else {
-            finalResulArray[indexes[j]] = resultArray[j];
+            let indexes;
+            if (resultArray && resultArray.length > 0) {
+              indexes = resultArray
+                .map((value) => parseInt(value.match(/[0-9]+(?=\>)/g)))
+                .filter((value) => !isNaN(value));
+              resultArray = resultArray.map((value) => {
+                const resultStartAtIndex = value.indexOf(">");
+                return value.slice(resultStartAtIndex + 1);
+              });
+            } else {
+              resultArray = [result];
+              indexes = [0];
+            }
+
+            resultArray = resultArray.map((value) =>
+              value.replace(/\<\/b\>/g, "")
+            );
+            resultArray = resultArray.map((value) => unescapeHTML(value));
+
+            const finalResulArray: any[] = [];
+            for (const j in indexes) {
+              if (finalResulArray[indexes[j]]) {
+                finalResulArray[indexes[j]] += " " + resultArray[j];
+              } else {
+                finalResulArray[indexes[j]] = resultArray[j];
+              }
+            }
+
+            resultArray3d.push(finalResulArray);
           }
         }
 
-        resultArray3d.push(finalResulArray);
+        //return fixResultArray(resultArray3d, fixIndexesMap)
+        return resultArray3d;
+      });
+    },
+    translateText: async (
+      sourceArray: any[],
+      targetLanguage: string,
+      dontSaveInCache = false
+    ) => {
+      if (targetLanguage == "zh") {
+        targetLanguage = "zh-CN";
       }
-    }
+      console.log('google translateText', sourceArray, targetLanguage)
+      return (
+        await translationService.google.translateHTML(
+          sourceArray.map((value) => [value]),
+          targetLanguage,
+          dontSaveInCache,
+          true
+        )
+      ).map((value) => value[0]);
+    },
+    translateSingleText: (
+      source: string,
+      targetLanguage: string,
+      dontSaveInCache = false
+    ) => {
+      translationService.google
+        .translateText([source], targetLanguage, dontSaveInCache)
+        .then((results) => results[0]);
+    },
+  },
+  yandex: {
+    translateHTML: async (
+      sourceArray3d: any[],
+      targetLanguage: string,
+      dontSaveInCache = false
+    ): Promise<any> => {
+      await getYandexSID();
+      if (!global.yandexTranslateSID) return;
 
-    //return fixResultArray(resultArray3d, fixIndexesMap)
-    return resultArray3d;
-  });
-};
+      if (targetLanguage.indexOf("zh-") !== -1) {
+        targetLanguage = "zh";
+      }
 
-translationService.google.translateText = async (
-  sourceArray,
-  targetLanguage,
-  dontSaveInCache = false
-) => {
-  if (targetLanguage == "zh") {
-    targetLanguage = "zh-CN";
-  }
-
-  return (
-    await translationService.google.translateHTML(
-      sourceArray.map((value) => [value]),
-      targetLanguage,
-      dontSaveInCache,
-      true
-    )
-  ).map((value) => value[0]);
-};
-
-translationService.google.translateSingleText = (
-  source,
-  targetLanguage,
-  dontSaveInCache = false
-) =>
-  translationService.google
-    .translateText([source], targetLanguage, dontSaveInCache)
-    .then((results) => results[0]);
-
-translationService.yandex.translateHTML = async (
-  sourceArray3d,
-  targetLanguage,
-  dontSaveInCache = false
-) => {
-  await getYandexSID();
-  if (!yandexTranslateSID) return;
-
-  if (targetLanguage.indexOf("zh-") !== -1) {
-    targetLanguage = "zh";
-  }
-
-  const sourceArray = sourceArray3d.map((sourceArray) =>
-    sourceArray.map((value) => escapeHTML(value)).join("<wbr>")
-  );
-
-  const requestBody = "format=html&lang=" + targetLanguage;
-  return await translateHTML(
-    "yandex",
-    targetLanguage,
-    "https://translate.yandex.net/api/v1/tr.json/translate?srv=tr-url-widget&id=" +
-      yandexTranslateSID +
-      "-0-0&",
-    sourceArray,
-    requestBody,
-    "text",
-    getTranslationInProgress("yandex", targetLanguage),
-    dontSaveInCache
-  ).then((thisTranslationProgress) => {
-    const results = thisTranslationProgress.map((value) => value.translated);
-
-    const resultArray3d = [];
-    for (const result of results) {
-      resultArray3d.push(
-        result.split("<wbr>").map((value) => unescapeHTML(value))
+      const sourceArray = sourceArray3d.map((sourceArray) =>
+        sourceArray.map((value) => escapeHTML(value)).join("<wbr>")
       );
-    }
 
-    return resultArray3d;
-  });
-};
+      const requestBody = "format=html&lang=" + targetLanguage;
+      return await translateHTML(
+        "yandex",
+        targetLanguage,
+        "https://translate.yandex.net/api/v1/tr.json/translate?srv=tr-url-widget&id=" +
+          global.yandexTranslateSID +
+          "-0-0&",
+        sourceArray,
+        requestBody,
+        "text",
+        getTranslationInProgress("yandex", targetLanguage),
+        dontSaveInCache
+      ).then((thisTranslationProgress: any[]) => {
+        const results = thisTranslationProgress.map(
+          (value) => value.translated
+        );
 
-translationService.yandex.translateText = async (
-  sourceArray,
-  targetLanguage,
-  dontSaveInCache = false
-) => {
-  if (targetLanguage.indexOf("zh-") !== -1) {
-    targetLanguage = "zh";
-  }
-
-  return (
-    await translationService.yandex.translateHTML(
-      sourceArray.map((value) => [value]),
-      targetLanguage,
-      dontSaveInCache
-    )
-  ).map((value) => value[0]);
-};
-
-translationService.yandex.translateSingleText = (
-  source,
-  targetLanguage,
-  dontSaveInCache = false
-) =>
-  translationService.yandex
-    .translateText([source], targetLanguage, dontSaveInCache)
-    .then((results) => results[0]);
-
-translationService.bing.translateSingleText = async (
-  source,
-  targetLanguage,
-  dontSaveInCache = false
-) => {
-  if (targetLanguage == "zh-CN") {
-    targetLanguage = "zh-Hans";
-  } else if (targetLanguage == "zh-TW") {
-    targetLanguage = "zh-Hant";
-  } else if (targetLanguage == "tl") {
-    targetLanguage = "fil";
-  } else if (targetLanguage.indexOf("zh-") !== -1) {
-    targetLanguage = "zh-Hans";
-  }
-  await getBingSID();
-
-  return await translateHTML(
-    "bing",
-    targetLanguage,
-    "https://www.bing.com/ttranslatev3?isVertical=1",
-    [source],
-    "",
-    "text",
-    getTranslationInProgress("bing", targetLanguage),
-    dontSaveInCache
-  ).then((thisTranslationProgress) => thisTranslationProgress[0].translated);
-};
-
-let DeepLTab = null;
-translationService.deepl.translateSingleText = (
-  source,
-  targetlanguage,
-  dontSaveInCache = false
-) => {
-  //*
-  return new Promise((resolve) => {
-    function waitFirstTranslationResult() {
-      function listener(request, sender, sendResponse) {
-        if (request.action === "DeepL_firstTranslationResult") {
-          resolve(request.result);
+        const resultArray3d: any[] = [];
+        for (const result of results) {
+          resultArray3d.push(
+            result.split("<wbr>").map((value) => unescapeHTML(value))
+          );
         }
+
+        return resultArray3d;
+      });
+    },
+    translateText: async (
+      sourceArray: any[],
+      targetLanguage: string,
+      dontSaveInCache = false
+    ): Promise<any> => {
+      if (targetLanguage.indexOf("zh-") !== -1) {
+        targetLanguage = "zh";
       }
 
-      setTimeout(() => {
-        resolve("");
-      }, 8000);
-    }
+      return (
+        await translationService.yandex.translateHTML(
+          sourceArray.map((value) => [value]),
+          targetLanguage,
+          dontSaveInCache
+        )
+      ).map((value) => value[0]);
+    },
+    translateSingleText: (
+      source: string,
+      targetLanguage: string,
+      dontSaveInCache = false
+    ) =>
+      translationService.yandex
+        .translateText([source], targetLanguage, dontSaveInCache)
+        .then((results) => results[0]),
+  },
+  bing: {
+    translateSingleText: async (
+      source: string,
+      targetLanguage: string,
+      dontSaveInCache = false
+    ) => {
+      if (targetLanguage == "zh-CN") {
+        targetLanguage = "zh-Hans";
+      } else if (targetLanguage == "zh-TW") {
+        targetLanguage = "zh-Hant";
+      } else if (targetLanguage == "tl") {
+        targetLanguage = "fil";
+      } else if (targetLanguage.indexOf("zh-") !== -1) {
+        targetLanguage = "zh-Hans";
+      }
+      await getBingSID();
 
-    if (DeepLTab) {
-      /* chrome.tabs.get(DeepLTab.id, (tab) => {
-        checkedLastError();
-        if (tab) {
-          //chrome.tabs.update(tab.id, {active: true})
-          chrome.tabs.sendMessage(
-            tab.id,
-            {
-              action: "translateTextWithDeepL",
-              text: source,
-              targetlanguage,
-            },
-            {
-              frameId: 0,
-            },
-            (response) => resolve(response)
-          );
-        } else {
-          chrome.tabs.create(
-            {
-              url: `https://www.deepl.com/#!${targetlanguage}!#${encodeURIComponent(
-                source
-              )}`,
-            },
-            (tab) => {
-              DeepLTab = tab;
-              waitFirstTranslationResult();
-            }
-          );
-          //resolve("")
-        }
-      }); */
-    } else {
-      /* chrome.tabs.create(
-        {
-          url: `https://www.deepl.com/#!${targetlanguage}!#${encodeURIComponent(
-            source
-          )}`,
-        },
-        (tab) => {
-          DeepLTab = tab;
-          waitFirstTranslationResult();
-        }
-      ); */
-      //resolve("")
-    }
-  });
-  //*/
-  /*
-        return new Promise((resolve, reject) => {
-            const request = {
-                "jsonrpc": "2.0",
-                "method": "LMT_handle_jobs",
-                "params": {
-                    "jobs": [{
-                        "kind": "default",
-                        "raw_en_sentence": source,
-                        "raw_en_context_before": [],
-                        "raw_en_context_after": [],
-                        "preferred_num_beams": 4
-                    }],
-                    "lang": {
-                        "user_preferred_langs": [targetlanguage.toUpperCase(), "EN"],
-                        "target_lang": targetlanguage.toUpperCase()
-                    },
-                    "priority": -1,
-                    "commonJobParams": { },
-                    "timestamp": Date.now()
-                },
-                "id": 0
-            }
-
-            const http = new XMLHttpRequest
-            http.open("POST", "https://www2.deepl.com/jsonrpc")
-            http.setRequestHeader("Content-Type", "application/json")
-            http.responseType = "json"
-
-            http.send(JSON.stringify(request).replace(`"method":`, `"method": `))
-
-            http.onload = e => {
-                const response = http.response
-                try {
-                    const translated = response.result.translations[0].beams[0].postprocessed_sentence
-                    resolve(translated)
-                } catch (e) {
-                    reject(e)
-                }
-            }
-
-            http.onerror = e => {
-                console.error(e)
-                reject(e)
-            }
-        })
-        //*/
+      return await translateHTML(
+        "bing",
+        targetLanguage,
+        "https://www.bing.com/ttranslatev3?isVertical=1",
+        [source],
+        "",
+        "text",
+        getTranslationInProgress("bing", targetLanguage),
+        dontSaveInCache
+      ).then(
+        (thisTranslationProgress: ITransInfo[]) => thisTranslationProgress[0].translated
+      );
+    },
+  },
 };
 
-translationService.translateHTML = (
-  request,
-  sender = false,
-  sendResponse = (res) => console.log(res)
-) => {
-  if (request.action === "translateHTML") {
-    let translateHTML;
-    if (request.translationService === "yandex") {
-      translateHTML = translationService.yandex.translateHTML;
-    } else {
-      translateHTML = translationService.google.translateHTML;
-    }
-
-    translateHTML(
-      request.sourceArray3d,
-      request.targetLanguage,
-      sender,
-      true,
-      request.dontSortResults
-    )
-      .then((results) => sendResponse(results))
-      .catch((e) => sendResponse(e));
-
-    return true;
-  } else if (request.action === "translateText") {
-    let translateText;
-    if (request.translationService === "yandex") {
-      translateText = translationService.yandex.translateText;
-    } else {
-      translateText = translationService.google.translateText;
-    }
-
-    translateText(
-      request.sourceArray,
-      request.targetLanguage,
-      sender
-    )
-      .then((results) => sendResponse(results))
-      .catch((e) => sendResponse());
-
-    return true;
-  } else if (request.action === "translateSingleText") {
-    let translateSingleText;
-    if (request.translationService === "deepl") {
-      translateSingleText = translationService.deepl.translateSingleText;
-    } else if (request.translationService === "yandex") {
-      translateSingleText = translationService.yandex.translateSingleText;
-    } else if (request.translationService === "bing") {
-      translateSingleText = translationService.bing.translateSingleText;
-    } else {
-      translateSingleText = translationService.google.translateSingleText;
-    }
-
-    translateSingleText(
-      request.source,
-      request.targetLanguage,
-      sender
-    )
-      .then((result) => sendResponse(result))
-      .catch((e) => sendResponse());
-
-    return true;
-  }
-};
-
-export default translationService;
+export default translationService
