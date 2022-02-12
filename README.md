@@ -9,7 +9,11 @@
 import translator from '@sternelee/translator-worker'
 
 window.onload = function () {
+  // 翻译全文
   translator.translatePage("zh");
+
+  // 翻译文本
+  translator.translateText("google", "zh", "I Love Code");
 
   // 恢复
   setTimeout(() => {
