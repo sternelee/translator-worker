@@ -1,5 +1,10 @@
-// import WebWorker from "./worker.ts?worker&inline";
-import TranslationService from "./translationService";
+import WebWorker from "./worker.ts?worker&inline";
+import { wrap } from 'comlink'
+// import TranslationService from "./translationService";
+
+const worker = new WebWorker()
+const TranslationService = wrap(worker)
+
 import {
   ServiceName,
   ISources,
@@ -22,7 +27,7 @@ function backgroundTranslateHTML(
     dontSortResults
   );
   return new Promise(async (resolve, reject) => {
-    const translator = TranslationService[translationService];
+    const translator =  TranslationService[translationService];
     const res = await translator["translateHTML"](
       sourceArray3d,
       targetLanguage,
@@ -38,7 +43,7 @@ function backgroundTranslateText(
   targetLanguage: string,
   sourceArray: ISources
 ) {
-  // console.log(translationService, targetLanguage, sourceArray);
+  console.log(translationService, targetLanguage, sourceArray);
   return new Promise(async (resolve, reject) => {
     const translator = TranslationService[translationService];
     const res = await translator["translateText"](sourceArray, targetLanguage);
@@ -54,6 +59,7 @@ function backgroundTranslateSingleText(
   console.log('backgroundTranslateSingleText', translationService, targetLanguage, source);
   return new Promise(async (resolve, reject) => {
     const translator = TranslationService[translationService];
+    console.log(translator)
     const res = await translator["translateSingleText"](source, targetLanguage);
     console.log('backgroundTranslateSingleText', res)
     resolve(res);
@@ -697,6 +703,7 @@ let pageTranslator = {
 
     translateDynamically();
   },
+  translateText: backgroundTranslateSingleText,
   restorePage: function () {
     fooCount++;
     piecesToTranslate = [];

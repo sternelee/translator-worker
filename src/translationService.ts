@@ -540,7 +540,7 @@ const translationService = {
       if (targetLanguage == "zh") {
         targetLanguage = "zh-CN";
       }
-      console.log('google translateText', sourceArray, targetLanguage)
+      console.log("google translateText", sourceArray, targetLanguage);
       return (
         await translationService.google.translateHTML(
           sourceArray.map((value) => [value]),
@@ -550,12 +550,13 @@ const translationService = {
         )
       ).map((value) => value[0]);
     },
-    translateSingleText: (
+    translateSingleText: async (
       source: string,
       targetLanguage: string,
       dontSaveInCache = false
     ) => {
-      translationService.google
+      console.log("google translateSingleText", source, targetLanguage);
+      return await translationService.google
         .translateText([source], targetLanguage, dontSaveInCache)
         .then((results) => results[0]);
     },
@@ -657,10 +658,11 @@ const translationService = {
         getTranslationInProgress("bing", targetLanguage),
         dontSaveInCache
       ).then(
-        (thisTranslationProgress: ITransInfo[]) => thisTranslationProgress[0].translated
+        (thisTranslationProgress: ITransInfo[]) =>
+          thisTranslationProgress[0].translated
       );
     },
   },
 };
 
-export default translationService
+export default translationService;

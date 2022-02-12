@@ -13,7 +13,9 @@ window.addEventListener("load", async () => {
   console.log(document.getElementById("app"));
   console.log(translator);
   translator.translatePage("zh");
-  // setTimeout(() => {
-  //   translator.restorePage()
-  // }, 5000)
+  const title = await translator.translateText("google", "zh", "I Love Code")
+  console.log('title', title)
+  setTimeout(() => {
+    translator.restorePage()
+  }, 5000)
 });
