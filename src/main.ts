@@ -9,7 +9,6 @@ app.innerHTML = `
 `;
 
 window.addEventListener("load", async () => {
-  console.log("1231321");
   console.log(document.getElementById("app"));
   console.log(translator);
   translator.translatePage("zh");
@@ -18,4 +17,7 @@ window.addEventListener("load", async () => {
   setTimeout(() => {
     translator.restorePage()
   }, 5000)
+  // setTimeout(() => {
+  //   translator.clearCache()
+  // }, 10000)
 });

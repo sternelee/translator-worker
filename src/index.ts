@@ -1,9 +1,10 @@
 import WebWorker from "./worker.ts?worker&inline";
 import { wrap } from 'comlink'
-// import TranslationService from "./translationService";
+import { ITranslationService } from "./translationService";
 
 const worker = new WebWorker()
-const TranslationService = wrap(worker)
+// @ts-ignore
+const TranslationService: ITranslationService = wrap(worker)
 
 import {
   ServiceName,
@@ -759,6 +760,7 @@ let pageTranslator = {
       observers.push(callback);
     }
   },
+  clearCache: TranslationService.clearCache
 };
 
 export default pageTranslator;

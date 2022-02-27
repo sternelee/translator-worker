@@ -663,6 +663,9 @@ const translationService = {
       );
     },
   },
+  clearCache: translationCache.deleteTranslationCache,
 };
 
 export default translationService;
+
+export type ITranslationService = typeof translationService
